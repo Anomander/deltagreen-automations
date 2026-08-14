@@ -90,6 +90,7 @@ ln -s "$PWD" "$HOME/Library/Application Support/FoundryVTT/Data/modules/deltagre
 npm install
 npm test                                    # unit + contract tests
 npm run sync:rolltypes                      # re-extract the system's roll types
+FOUNDRY_USER=Claude npm run fvtt:config     # add a mapping through the real UI
 FOUNDRY_USER=Claude npm run fvtt:capture    # roll in a live world, dump what arrives
 FOUNDRY_USER=Claude npm run fvtt:smoke      # prove a mapping plays its effect
 ```

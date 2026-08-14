@@ -331,7 +331,137 @@ function reportConsole(consoleLog) {
   }
 }
 
-const commands = { probe, capture, smoke };
+/**
+ * The config UI, driven as a user drives it.
+ *
+ * Adding a mapping is the first thing anyone does with this module and the one
+ * flow no unit test reaches: it is an ApplicationV2 render, a form round trip
+ * and a world setting write. Every step below is checked separately, because
+ * "it didn't work" has four different causes and they need telling apart.
+ */
+async function config() {
+  const { browser, page, consoleLog } = await connect();
+  const info = await requireSystem(page);
+  if (!info.module) throw new Error('deltagreen-automations is not active in this world.');
+
+  const checks = [];
+  const record = (name, pass, detail = '') => {
+    checks.push({ check: name, result: pass ? 'PASS' : 'FAIL', detail });
+    return pass;
+  };
+
+  // Start from a known state, and remember what the world had.
+  const saved = await page.evaluate(() => {
+    const mappings = globalThis.DeltaGreenAutomations.getMappings();
+    return JSON.stringify(mappings);
+  });
+
+  // 1 — does the window render at all? A missing Handlebars helper or a bad
+  // template path fails here, and fails silently apart from a console error.
+  const opened = await page.evaluate(async () => {
+    try {
+      await globalThis.DeltaGreenAutomations.openConfig();
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      return { ok: Boolean(document.querySelector('#dga-effect-mapping-config')), error: null };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
+  record('the config window renders', opened.ok, opened.error ?? '');
+
+  if (!opened.ok) {
+    console.table(checks);
+    reportConsole(consoleLog);
+    await page.screenshot({ path: 'tools/.out/config-failed.png' });
+    console.log('Screenshot: tools/.out/config-failed.png');
+    await browser.close();
+    process.exit(1);
+  }
+
+  // 2 — the Add button produces a row.
+  const rowsBefore = await page.locator('#dga-effect-mapping-config .dga-mapping').count();
+  await page.locator('#dga-effect-mapping-config [data-action="addMapping"]').click({ timeout: 4000 });
+  await page.waitForTimeout(600);
+  const rowsAfter = await page.locator('#dga-effect-mapping-config .dga-mapping').count();
+  record('Add Mapping adds a row', rowsAfter === rowsBefore + 1, `${rowsBefore} → ${rowsAfter}`);
+
+  // 3 — fill it in as a user would, through the real inputs.
+  const row = page.locator('#dga-effect-mapping-config .dga-mapping').last();
+  const mappingId = await row.getAttribute('data-mapping-id');
+  await row.locator('input[name$=".label"]').fill('Driver Test');
+  await row.locator('input[name$=".effectFile"]').fill('jb2a.bullet.01.orange');
+  await row.locator('select[name$=".trigger"]').selectOption('weapon');
+  await row.locator('input[name$=".match"]').fill('pistol');
+
+  // 4 — save, and read the world setting back rather than the DOM.
+  await page.locator('#dga-effect-mapping-config button[type="submit"]').click({ timeout: 4000 });
+  await page.waitForTimeout(1000);
+
+  const stored = await page.evaluate(
+    (id) => globalThis.DeltaGreenAutomations.getMappings().find((m) => m.id === id) ?? null,
+    mappingId
+  );
+
+  record('saving writes the mapping to the world setting', Boolean(stored), stored ? '' : 'not found after save');
+  if (stored) {
+    record('the typed values survive the round trip', stored.label === 'Driver Test' && stored.effectFile === 'jb2a.bullet.01.orange' && stored.trigger === 'weapon' && stored.match === 'pistol', JSON.stringify({ label: stored.label, trigger: stored.trigger, match: stored.match, effectFile: stored.effectFile }));
+    record('numbers come back as numbers, not strings', typeof stored.scale === 'number' && typeof stored.delay === 'number', `scale=${typeof stored.scale}, delay=${typeof stored.delay}`);
+    record('the enabled checkbox comes back as a boolean', typeof stored.enabled === 'boolean', `enabled=${JSON.stringify(stored.enabled)}`);
+  }
+
+  // 5 — reopen: the saved row must come back, which is where a broken
+  // re-render or a lost id shows up.
+  const reopened = await page.evaluate(async (id) => {
+    await globalThis.DeltaGreenAutomations.openConfig();
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    return document.querySelectorAll(`#dga-effect-mapping-config [data-mapping-id="${id}"]`).length;
+  }, mappingId);
+  record('the saved mapping is there when the window is reopened', reopened === 1, `${reopened} row(s)`);
+
+  await page.screenshot({ path: 'tools/.out/config.png' });
+
+  // Put the world's own mappings back.
+  await page.evaluate(async (json) => {
+    await globalThis.DeltaGreenAutomations.setMappings(JSON.parse(json));
+    Object.values(ui.windows).forEach((w) => w.close?.());
+    document.querySelector('#dga-effect-mapping-config')?.remove();
+  }, saved);
+
+  console.table(checks);
+  console.log('Screenshot: tools/.out/config.png');
+  reportConsole(consoleLog);
+  await browser.close();
+
+  if (checks.some((c) => c.result === 'FAIL')) process.exit(1);
+}
+
+/**
+ * Snapshot the Handlebars helpers the running Foundry actually registers.
+ *
+ * v14 removed `selected`, which v13 had. A template using it renders nothing
+ * and the error is swallowed by ApplicationV2's render, so the window simply
+ * comes up empty — no unit test could see it, and neither could a reader of
+ * the template. `tests/handlebars-helpers.test.mjs` compares our templates
+ * against this snapshot so the next removal fails at `npm test`.
+ */
+async function helpers() {
+  const { browser, page } = await connect();
+
+  const snapshot = await page.evaluate(() => ({
+    foundry: game.version,
+    helpers: Object.keys(Handlebars.helpers).sort()
+  }));
+
+  fs.mkdirSync('tests/fixtures', { recursive: true });
+  fs.writeFileSync('tests/fixtures/handlebars-helpers.json', `${JSON.stringify(snapshot, null, 2)}\n`);
+
+  console.log(`Wrote tests/fixtures/handlebars-helpers.json from Foundry ${snapshot.foundry}`);
+  console.log(`  ${snapshot.helpers.length} helpers registered`);
+
+  await browser.close();
+}
+
+const commands = { probe, capture, smoke, config, helpers };
 const command = commands[process.argv[2] ?? 'capture'];
 
 if (!command) {

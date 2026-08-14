@@ -32,6 +32,7 @@ and targets — lives in `scripts/system-adapter.js` and is verified by the driv
 | `matching.test.mjs` | Does the right mapping fire, and only that one? |
 | `manifest.test.mjs` | Does `module.json` declare paths that exist and ship in the zip? |
 | `lang.test.mjs` | Does every key referenced exist, and every key defined get used? |
+| `handlebars-helpers.test.mjs` | Does every helper our templates call still exist in Foundry? |
 
 Two of these name a specific defect. `roll-parse.test.mjs` asserts *"treats the system's null
 verdict on an unevaluated roll as absence"* — `DGPercentileRoll#isSuccess` returns `null`, not
@@ -41,7 +42,24 @@ verdict"* — a damage roll has no success, and "unknown" must not read as a pas
 
 **Tests name the defect, not the method.**
 
-## Tier 2 — The roll-type snapshot
+## Tier 2 — Snapshot-contract tests
+
+Two undocumented dependencies are pinned this way: the system's roll vocabulary, and Foundry's
+Handlebars helpers.
+
+### The Handlebars helper snapshot
+
+Foundry v14 removed the `selected` helper that v13 had. The config template used it, ApplicationV2
+swallowed the resulting render error, and the window came up with no rows and no message — "adding
+a mapping does nothing", with nothing wrong-looking in the template or the code, and nothing a unit
+test could see.
+
+`tests/fixtures/handlebars-helpers.json` is captured from a running world with `npm run
+fvtt:helpers`. `handlebars-helpers.test.mjs` extracts every helper call from `templates/*.hbs` and
+asserts each one exists in it, so the next removal fails at `npm test`. Recapture the snapshot when
+upgrading Foundry — and expect that upgrade to be the moment it earns its keep.
+
+### The roll-type snapshot
 
 Every trigger in the module is keyed on the system's `rollType` vocabulary, so that vocabulary is
 extracted and committed.
@@ -91,9 +109,11 @@ Set `DG_SYSTEM_PATH` if the system is installed somewhere non-standard.
 
 ```bash
 FOUNDRY_USER=Claude npm run fvtt:probe      # list joinable users
+FOUNDRY_USER=Claude npm run fvtt:config     # add a mapping through the real UI
 FOUNDRY_USER=Claude npm run fvtt:capture    # roll for real, dump what arrives
 FOUNDRY_USER=Claude npm run fvtt:smoke      # prove a mapping plays its effect
-HEADED=1 FOUNDRY_USER=Claude npm run fvtt:capture   # watch it happen
+FOUNDRY_USER=Claude npm run fvtt:helpers    # recapture the helper snapshot
+HEADED=1 FOUNDRY_USER=Claude npm run fvtt:config   # watch it happen
 ```
 
 **It needs a dedicated GM account.** Foundry disables a user who is already connected, so the driver
@@ -104,6 +124,12 @@ cannot share yours. Create a second GM and pass it via `FOUNDRY_USER`.
 **revived** roll re-read from the chat message. Our adapter reads the revived one — the same object
 every other client gets — so a field present live and gone after the round trip is a field the
 module must not depend on. Output lands in `tools/.out/capture.json`.
+
+`config` drives the UI as a user does: open, Add Mapping, fill the inputs, save, reopen. It checks
+each step separately, because "adding a mapping doesn't work" has four causes that need telling
+apart — and it reads the saved values back out of the world setting rather than off the DOM, which
+is where a checkbox that returns `"on"` or a number that returns a string would show up. It is the
+command that caught the `selected` helper removal.
 
 `smoke` installs a temporary mapping, rolls, and uses Sequencer's `EffectManager` as the witness: a
 sequence that was built but never reached the canvas leaves nothing there, which is exactly the

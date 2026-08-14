@@ -9,7 +9,9 @@
     "sync:rolltypes": "node tools/sync-rolltypes.mjs",
     "fvtt:probe": "node tools/foundry-driver.mjs probe",
     "fvtt:capture": "node tools/foundry-driver.mjs capture",
-    "fvtt:smoke": "node tools/foundry-driver.mjs smoke"
+    "fvtt:smoke": "node tools/foundry-driver.mjs smoke",
+    "fvtt:config": "node tools/foundry-driver.mjs config",
+    "fvtt:helpers": "node tools/foundry-driver.mjs helpers"
   },
   "devDependencies": {
     "playwright": "^1.62.1",

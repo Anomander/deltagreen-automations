@@ -35,9 +35,7 @@
           <label>
             {{localize "DGA.Field.Trigger"}}
             <select name="mappings.{{mapping.id}}.trigger">
-              {{#each ../triggers as |choice|}}
-                <option value="{{choice.value}}" {{selected (eq choice.value mapping.trigger)}}>{{choice.label}}</option>
-              {{/each}}
+              {{selectOptions ../triggers selected=mapping.trigger valueAttr="value" labelAttr="label"}}
             </select>
           </label>
 
@@ -50,18 +48,14 @@
           <label>
             {{localize "DGA.Field.Outcome"}}
             <select name="mappings.{{mapping.id}}.outcome">
-              {{#each ../outcomes as |choice|}}
-                <option value="{{choice.value}}" {{selected (eq choice.value mapping.outcome)}}>{{choice.label}}</option>
-              {{/each}}
+              {{selectOptions ../outcomes selected=mapping.outcome valueAttr="value" labelAttr="label"}}
             </select>
           </label>
 
           <label>
             {{localize "DGA.Field.Placement"}}
             <select name="mappings.{{mapping.id}}.placement">
-              {{#each ../placements as |choice|}}
-                <option value="{{choice.value}}" {{selected (eq choice.value mapping.placement)}}>{{choice.label}}</option>
-              {{/each}}
+              {{selectOptions ../placements selected=mapping.placement valueAttr="value" labelAttr="label"}}
             </select>
           </label>
 

@@ -1,0 +1,67 @@
+{
+  "id": "deltagreen-automations",
+  "title": "Delta Green Automations",
+  "description": "Automation helpers for running Delta Green games in Foundry VTT. Starts with a configurable Sequencer effect layer for skill and attack rolls.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "14",
+    "maximum": "14"
+  },
+  "authors": [
+    {
+      "name": "Anomander",
+      "github": "Anomander"
+    }
+  ],
+  "esmodules": ["scripts/module.js"],
+  "styles": ["styles/deltagreen-automations.css"],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "deltagreen",
+        "type": "system",
+        "compatibility": {}
+      }
+    ],
+    "requires": [
+      {
+        "id": "sequencer",
+        "type": "module",
+        "manifest": "https://github.com/fantasycalendar/FoundryVTT-Sequencer/releases/latest/download/module.json",
+        "compatibility": {}
+      }
+    ],
+    "recommends": [
+      {
+        "id": "JB2A_DnD5e",
+        "type": "module",
+        "reason": "Provides the default animation library referenced by the bundled effect presets."
+      },
+      {
+        "id": "portal-lib",
+        "type": "module",
+        "reason": "Crosshair / targeting helpers used by placement-based effects."
+      },
+      {
+        "id": "psfx",
+        "type": "module",
+        "reason": "Sound effect library used by the bundled audio presets."
+      }
+    ]
+  },
+  "socket": false,
+  "url": "https://github.com/Anomander/deltagreen-automations",
+  "manifest": "https://github.com/Anomander/deltagreen-automations/releases/latest/download/module.json",
+  "download": "https://github.com/Anomander/deltagreen-automations/releases/latest/download/module.zip",
+  "license": "LICENSE",
+  "readme": "https://github.com/Anomander/deltagreen-automations#readme",
+  "bugs": "https://github.com/Anomander/deltagreen-automations/issues"
+}

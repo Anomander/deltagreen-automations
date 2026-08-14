@@ -1,0 +1,124 @@
+<section class="dga-config">
+  {{#unless sequencerActive}}
+    <p class="notification warning">{{localize "DGA.Config.SequencerMissing"}}</p>
+  {{/unless}}
+
+  <header class="dga-config__header">
+    <p class="hint">{{localize "DGA.Config.Hint"}}</p>
+    <button type="button" data-action="addMapping">
+      <i class="fa-solid fa-plus"></i> {{localize "DGA.Config.Add"}}
+    </button>
+  </header>
+
+  <div class="dga-mappings">
+    {{#each mappings as |mapping|}}
+      <fieldset class="dga-mapping" data-mapping-id="{{mapping.id}}">
+        <legend>
+          <input type="text" name="mappings.{{mapping.id}}.label" value="{{mapping.label}}"
+                 aria-label="{{localize 'DGA.Field.Label'}}" />
+          <label class="dga-toggle">
+            <input type="checkbox" name="mappings.{{mapping.id}}.enabled" {{checked mapping.enabled}} />
+            {{localize "DGA.Field.Enabled"}}
+          </label>
+          <button type="button" data-action="previewMapping" data-tooltip="{{localize 'DGA.Config.Preview'}}">
+            <i class="fa-solid fa-play"></i>
+          </button>
+          <button type="button" data-action="duplicateMapping" data-tooltip="{{localize 'DGA.Config.Duplicate'}}">
+            <i class="fa-solid fa-copy"></i>
+          </button>
+          <button type="button" data-action="deleteMapping" data-tooltip="{{localize 'DGA.Config.Delete'}}">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </legend>
+
+        <div class="dga-grid">
+          <label>
+            {{localize "DGA.Field.Trigger"}}
+            <select name="mappings.{{mapping.id}}.trigger">
+              {{#each ../triggers as |choice|}}
+                <option value="{{choice.value}}" {{selected (eq choice.value mapping.trigger)}}>{{choice.label}}</option>
+              {{/each}}
+            </select>
+          </label>
+
+          <label>
+            {{localize "DGA.Field.Match"}}
+            <input type="text" name="mappings.{{mapping.id}}.match" value="{{mapping.match}}"
+                   placeholder="{{localize 'DGA.Field.MatchPlaceholder'}}" />
+          </label>
+
+          <label>
+            {{localize "DGA.Field.Outcome"}}
+            <select name="mappings.{{mapping.id}}.outcome">
+              {{#each ../outcomes as |choice|}}
+                <option value="{{choice.value}}" {{selected (eq choice.value mapping.outcome)}}>{{choice.label}}</option>
+              {{/each}}
+            </select>
+          </label>
+
+          <label>
+            {{localize "DGA.Field.Placement"}}
+            <select name="mappings.{{mapping.id}}.placement">
+              {{#each ../placements as |choice|}}
+                <option value="{{choice.value}}" {{selected (eq choice.value mapping.placement)}}>{{choice.label}}</option>
+              {{/each}}
+            </select>
+          </label>
+
+          <label class="dga-grid__wide">
+            {{localize "DGA.Field.EffectFile"}}
+            <span class="dga-file">
+              <input type="text" name="mappings.{{mapping.id}}.effectFile" value="{{mapping.effectFile}}"
+                     placeholder="jb2a.bullet.01.orange" />
+              <button type="button" data-action="browseFile" data-picker-type="imagevideo">
+                <i class="fa-solid fa-file-import"></i>
+              </button>
+            </span>
+          </label>
+
+          <label class="dga-grid__wide">
+            {{localize "DGA.Field.Sound"}}
+            <span class="dga-file">
+              <input type="text" name="mappings.{{mapping.id}}.sound" value="{{mapping.sound}}" />
+              <button type="button" data-action="browseFile" data-picker-type="audio">
+                <i class="fa-solid fa-file-audio"></i>
+              </button>
+            </span>
+          </label>
+
+          <label>
+            {{localize "DGA.Field.Scale"}}
+            <input type="number" step="0.1" min="0.1" name="mappings.{{mapping.id}}.scale" value="{{mapping.scale}}" />
+          </label>
+
+          <label>
+            {{localize "DGA.Field.Delay"}}
+            <input type="number" step="50" min="0" name="mappings.{{mapping.id}}.delay" value="{{mapping.delay}}" />
+          </label>
+
+          <label>
+            {{localize "DGA.Field.FadeIn"}}
+            <input type="number" step="50" min="0" name="mappings.{{mapping.id}}.fadeIn" value="{{mapping.fadeIn}}" />
+          </label>
+
+          <label>
+            {{localize "DGA.Field.FadeOut"}}
+            <input type="number" step="50" min="0" name="mappings.{{mapping.id}}.fadeOut" value="{{mapping.fadeOut}}" />
+          </label>
+
+          <label>
+            {{localize "DGA.Field.Repeats"}}
+            <input type="number" step="1" min="1" name="mappings.{{mapping.id}}.repeats" value="{{mapping.repeats}}" />
+          </label>
+
+          <label class="dga-toggle">
+            <input type="checkbox" name="mappings.{{mapping.id}}.belowTokens" {{checked mapping.belowTokens}} />
+            {{localize "DGA.Field.BelowTokens"}}
+          </label>
+        </div>
+      </fieldset>
+    {{else}}
+      <p class="dga-empty">{{localize "DGA.Config.Empty"}}</p>
+    {{/each}}
+  </div>
+</section>

@@ -1,6 +1,7 @@
 import { MODULE_ID } from "./constants.js";
 import { buildRollContext } from "./system-adapter.js";
 import { runEffectsForRoll } from "./effect-runner.js";
+import { isDebug } from "./settings.js";
 
 /**
  * Effects are driven from chat messages so that every client sees the same
@@ -11,7 +12,7 @@ export function registerRollListener() {
   Hooks.on("createChatMessage", async (message) => {
     if (message.author?.id !== game.user.id) return;
 
-    const context = buildRollContext(message);
+    const context = buildRollContext(message, { debug: isDebug() });
     if (!context) return;
 
     Hooks.callAll(`${MODULE_ID}.roll`, context, message);

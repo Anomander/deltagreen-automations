@@ -1,57 +1,61 @@
-import { MODULE_ID, TRIGGERS, OUTCOMES } from "./constants.js";
-import { isDebug } from "./settings.js";
+import { MODULE_ID } from "./constants.js";
+import { factsFromRoll, nameFor, outcomeFor, triggerFor } from "./core/roll-parse.js";
 
 /**
- * The Delta Green system does not expose a stable public roll hook, so the
- * module normalises whatever it can find on the created ChatMessage into a
- * single RollContext shape. Everything downstream only ever sees this object.
+ * The Foundry-facing half of roll detection: resolve documents, then hand the
+ * roll itself to the pure rules in core/roll-parse.js.
+ *
+ * The `deltagreen` system publishes no roll hook and writes no outcome flag —
+ * `flags.deltagreen` carries only `chatCard: true`. What it does carry is
+ * `roll.options.rollType` and `roll.options.key`, set in DGRoll's constructor
+ * and serialised into the message with the roll. Those are the signals here.
  *
  * @typedef {object} RollContext
  * @property {string}   trigger  One of TRIGGERS.
- * @property {string}   name     Skill / stat / item name that was rolled.
+ * @property {string}   name     Weapon / skill name the filter matches against.
  * @property {string}   outcome  One of OUTCOMES.
  * @property {Actor}    actor
  * @property {Token}    token    Best-guess token for the acting actor.
- * @property {Token[]}  targets  Targets of the rolling user at roll time.
+ * @property {Token[]}  targets  Targets held by the rolling user.
  * @property {Roll}     roll
- * @property {number}   total
- * @property {number}   target   Target number the roll was made against, if known.
+ * @property {object}   facts    The reduced roll data the decision was made on.
  */
 
 /**
  * @param {ChatMessage} message
+ * @param {{debug?: boolean}} [options]
  * @returns {RollContext|null}
  */
-export function buildRollContext(message) {
+export function buildRollContext(message, { debug = false } = {}) {
   const roll = message.rolls?.[0];
   if (!roll) return null;
 
-  const flags = message.flags?.deltagreen ?? {};
-  if (isDebug()) {
-    console.log(`${MODULE_ID} | chat message inspected`, {
-      flags: message.flags,
-      flavor: message.flavor,
-      roll
+  const facts = factsFromRoll(roll);
+
+  if (debug) {
+    console.log(`${MODULE_ID} | roll observed`, {
+      facts,
+      rollClass: roll.constructor?.name,
+      options: roll.options,
+      flags: message.flags
     });
   }
 
+  // A roll with no recognised type is not ours to act on. Bailing here keeps
+  // "Any Roll" mappings from firing on every unrelated /r in chat.
+  if (!facts.rollType) return null;
+
   const actor = resolveActor(message);
-  const token = resolveToken(message, actor);
-  const name = resolveName(message, flags);
-  const trigger = resolveTrigger(message, flags, roll);
-  const target = resolveTarget(flags, roll);
-  const outcome = resolveOutcome(flags, roll, target);
 
   return {
-    trigger,
-    name,
-    outcome,
+    trigger: triggerFor(facts),
+    name: nameFor(facts),
+    outcome: outcomeFor(facts),
     actor,
-    token,
+    token: resolveToken(message, actor),
     targets: resolveTargets(message),
     roll,
-    total: roll.total,
-    target
+    facts
   };
 }
 
@@ -65,10 +69,10 @@ function resolveActor(message) {
   return game.actors.get(speaker.actor) ?? null;
 }
 
+/** The placeable on the current canvas, since Sequencer animates placeables. */
 function resolveToken(message, actor) {
   const speaker = message.speaker ?? {};
-  const scene = game.scenes.get(speaker.scene) ?? canvas.scene;
-  if (speaker.token && scene?.id === canvas.scene?.id) {
+  if (speaker.token && speaker.scene === canvas.scene?.id) {
     const placed = canvas.tokens?.get(speaker.token);
     if (placed) return placed;
   }
@@ -76,67 +80,11 @@ function resolveToken(message, actor) {
   return canvas.tokens?.placeables.find((t) => t.actor?.id === actor.id) ?? null;
 }
 
-function resolveName(message, flags) {
-  const candidates = [flags.skillName, flags.itemName, flags.label, flags.name];
-  const found = candidates.find((c) => typeof c === "string" && c.length);
-  if (found) return found;
-  // Fall back to the message flavor with markup stripped.
-  const flavor = message.flavor ?? "";
-  return flavor.replace(/<[^>]*>/g, "").trim();
-}
-
-function resolveTrigger(message, flags, roll) {
-  const declared = flags.type ?? flags.rollType;
-  if (typeof declared === "string") {
-    const normalised = declared.toLowerCase();
-    for (const value of Object.values(TRIGGERS)) {
-      if (normalised.includes(value)) return value;
-    }
-  }
-
-  const name = resolveName(message, flags).toLowerCase();
-  if (name.includes("sanity") || name.includes("san ")) return TRIGGERS.SANITY;
-
-  // A d100 roll is a test; anything else in this system is damage / lethality.
-  const isPercentile = roll.dice?.some((d) => d.faces === 100);
-  if (!isPercentile) return TRIGGERS.DAMAGE;
-
-  const actorItem = flags.itemName ?? flags.weaponName;
-  if (actorItem) return TRIGGERS.WEAPON;
-  return TRIGGERS.SKILL;
-}
-
-function resolveTarget(flags, roll) {
-  const candidates = [flags.target, flags.targetValue, flags.rating, roll.options?.target];
-  const found = candidates.find((c) => Number.isFinite(c));
-  return Number.isFinite(found) ? found : null;
-}
-
-function resolveOutcome(flags, roll, target) {
-  if (typeof flags.outcome === "string") {
-    const normalised = flags.outcome.toLowerCase();
-    // Order matters: "critical success" must not resolve to plain success.
-    const priority = [OUTCOMES.CRITICAL, OUTCOMES.FUMBLE, OUTCOMES.FAILURE, OUTCOMES.SUCCESS];
-    for (const value of priority) {
-      if (normalised.includes(value)) return value;
-    }
-  }
-
-  const isPercentile = roll.dice?.some((d) => d.faces === 100);
-  if (!isPercentile || target === null) return OUTCOMES.ANY;
-
-  const total = roll.total;
-  const isDouble = total % 11 === 0 || total === 100;
-  const success = total <= target;
-
-  if (total === 1) return OUTCOMES.CRITICAL;
-  if (total === 100) return OUTCOMES.FUMBLE;
-  if (isDouble) return success ? OUTCOMES.CRITICAL : OUTCOMES.FUMBLE;
-  return success ? OUTCOMES.SUCCESS : OUTCOMES.FAILURE;
-}
-
+/**
+ * Targets are read from the rolling user, not the local one — otherwise every
+ * client resolves a "on the target's token" effect against its own targeting.
+ */
 function resolveTargets(message) {
   const user = game.users.get(message.author?.id ?? message.user?.id);
-  const targets = user?.targets ?? game.user.targets;
-  return Array.from(targets ?? []);
+  return Array.from(user?.targets ?? []);
 }

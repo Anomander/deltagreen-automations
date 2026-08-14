@@ -47,10 +47,14 @@ lethality, failure marks) are planned.
 
 ## Troubleshooting
 
-If a mapping never fires, enable **Log Roll Data** in module settings. Every roll message is then
-printed to the console with its flags, the trigger and outcome the module derived, and which
-mappings matched. The `deltagreen` system does not publish a stable roll hook, so detection reads
-chat message flags with a fallback to the message flavor — the log shows exactly what it saw.
+If a mapping never fires, enable **Log Roll Data** in module settings. Every roll is then printed to
+the console with the facts the module read from it, the trigger and outcome it derived, and which
+mappings matched.
+
+The `deltagreen` system publishes no roll hook and writes no outcome into chat message flags, so
+detection reads `roll.options.rollType` and `roll.options.key` — set in the system's `DGRoll`
+constructor and serialised into the message with the roll. Where the roll revives far enough to
+carry the system's own `isSuccess` / `isCritical`, that verdict is used rather than recomputed.
 
 ## API
 
@@ -79,6 +83,21 @@ directory to work on it live:
 ```sh
 ln -s "$PWD" "$HOME/Library/Application Support/FoundryVTT/Data/modules/deltagreen-automations"
 ```
+
+### Testing
+
+```sh
+npm install
+npm test                                    # unit + contract tests
+npm run sync:rolltypes                      # re-extract the system's roll types
+FOUNDRY_USER=Claude npm run fvtt:capture    # roll in a live world, dump what arrives
+FOUNDRY_USER=Claude npm run fvtt:smoke      # prove a mapping plays its effect
+```
+
+The live-world commands drive Foundry with Playwright and need a **dedicated GM account** — Foundry
+disables a user who is already connected, so the driver cannot share yours. See
+[docs/TESTING.md](docs/TESTING.md) for the full strategy, including the roll-type snapshot that
+catches system drift.
 
 Releases are cut by pushing a tag (`v0.1.0`); the GitHub Action builds `module.zip`, rewrites the
 manifest version, and publishes both to the release.

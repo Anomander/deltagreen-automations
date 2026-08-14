@@ -1,5 +1,8 @@
-import { MODULE_ID, OUTCOMES, PLACEMENTS, TRIGGERS } from "./constants.js";
+import { MODULE_ID, PLACEMENTS } from "./constants.js";
 import { getMappings, isDebug, isEnabled } from "./settings.js";
+import { matchesContext } from "./core/matching.js";
+
+export { matchesContext };
 
 /**
  * @param {import("./system-adapter.js").RollContext} context
@@ -18,31 +21,6 @@ export async function runEffectsForRoll(context) {
       console.error(`${MODULE_ID} | failed to play effect "${mapping.label}"`, error);
     }
   }
-}
-
-/**
- * @param {object} mapping
- * @param {import("./system-adapter.js").RollContext} context
- */
-export function matchesContext(mapping, context) {
-  if (!mapping.enabled) return false;
-  if (!mapping.effectFile && !mapping.sound) return false;
-
-  if (mapping.trigger !== TRIGGERS.ANY && mapping.trigger !== context.trigger) return false;
-
-  if (mapping.outcome !== OUTCOMES.ANY) {
-    if (mapping.outcome === OUTCOMES.SUCCESS) {
-      // A critical is still a success for mappings that only ask for success.
-      if (![OUTCOMES.SUCCESS, OUTCOMES.CRITICAL].includes(context.outcome)) return false;
-    } else if (mapping.outcome === OUTCOMES.FAILURE) {
-      if (![OUTCOMES.FAILURE, OUTCOMES.FUMBLE].includes(context.outcome)) return false;
-    } else if (mapping.outcome !== context.outcome) return false;
-  }
-
-  const needle = (mapping.match ?? "").trim().toLowerCase();
-  if (needle && !(context.name ?? "").toLowerCase().includes(needle)) return false;
-
-  return true;
 }
 
 /**
